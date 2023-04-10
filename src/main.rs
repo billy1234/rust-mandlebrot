@@ -29,7 +29,7 @@ fn calc_mandle_divergence(mut a : f32, mut b : f32, max_iter : u32) -> f32{
         b = b + z0_b;
 
     }
-    return 1.0;
+    return 0.0;
 }
 
 fn calc_mandlebrot_set(a : f32, b: f32, zoom_level: f32, max_iter: u32) 
@@ -53,18 +53,31 @@ fn calc_mandlebrot_set(a : f32, b: f32, zoom_level: f32, max_iter: u32)
     return arr;
 }
 
+//map divergence value (x) to a set of r/g/b
+fn map_color(x : f32) -> [u8; 3]{
+    //Constant is max of u24 (3 u8s)
+    let num = (x * 4294967296.0) as u32;
+    let mut arr : [u8; 3] = [0; 3];
+    
+    arr[0] = num as u8;
+    arr[1] = (num >> 8) as u8;
+    arr[2] = (num >> 16) as u8;
+    
+    return arr;
+}
+
 fn render_mandlebrot(
     arr : &[[f32; HEIGHT as usize]; WIDTH as usize],
     frame : & mut [u8]
     ){
-
+    
     for x in 0..WIDTH{
         for y in 0..HEIGHT{
-            frame[((x + (y * WIDTH)) * 4) as usize] 
-                = (arr[x as usize][y as usize] 
-                    * (u8::MAX as f32)) as u8;
-            
-
+            let col = map_color(arr[x as usize][y as usize]); 
+            // r/g/b/a
+            frame[((x + (y * WIDTH)) * 4    ) as usize] = col[0];
+            frame[((x + (y * WIDTH)) * 4 + 1) as usize] = col[1];
+            frame[((x + (y * WIDTH)) * 4 + 2) as usize] = col[2];
             frame[((x + (y * WIDTH)) * 4 + 3) as usize] = 0xff;
         }
     }
@@ -73,10 +86,9 @@ fn render_mandlebrot(
 
 
 fn main() -> Result<(),Error>{
-    println!("Hello world.");
-    
+
     let arr = calc_mandlebrot_set(0.0,0.0,0.01,255);
-    
+
     let event_loop = EventLoop::new();
 
     let window = { 
@@ -99,13 +111,13 @@ fn main() -> Result<(),Error>{
     render_mandlebrot(&arr,pixels.frame_mut());
     pixels.render()?;
 
-    event_loop.run(move | event, _, control_flow | {
+    event_loop.run(move | event, _, _control_flow | {
         
         if let Event::RedrawRequested(_) = event {
-            println!("event missing")
+            //render_mandlebrot(&arr,pixels.frame_mut());
+           //pixels.render();
         }
     });
 
 }
-
 
