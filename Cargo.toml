@@ -1,0 +1,10 @@
+﻿[package]
+name= "rust_manlebrot"
+version="0.1.0"
+authors = ["Billy Mihalarias"]
+edition="2021"
+
+[dependencies]
+pixels="0.12.0"
+winit = "0.27"
+
