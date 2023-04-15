@@ -69,7 +69,7 @@ fn calc_mandle_divergence(
     mut a : f64, 
     mut b : f64, 
     max_iter : u32
-) -> f64{
+) -> f64 {
 
     let z0_a : f64 = a;
     let z0_b : f64 = b;
@@ -152,7 +152,7 @@ fn main() -> Result<(),Error>{
         x:-0.20710786709396773,
         y:1.12275706363259748,
         zoom:0.01,
-        iterations:1000 
+        iterations:300 
     };
 
     let mut grid: Grid<f64> 
@@ -198,6 +198,8 @@ fn main() -> Result<(),Error>{
     
     render_mandlebrot(&grid,pixels.frame_mut());
     pixels.render()?;
+
+    window.set_maximized(true);
 
     event_loop.run(move | event, _, _control_flow | {
         settings.zoom = settings.zoom * 0.95;
