@@ -1,12 +1,12 @@
 use pixels::{Error, Pixels, SurfaceTexture};
 use winit::{
     dpi::LogicalSize,
-    event::Event,
-    event_loop::EventLoop,
+    event::{Event, WindowEvent},
+    event_loop::{EventLoop, ControlFlow},
     window::WindowBuilder,
 };
 use std::clone::Clone;
-
+use std::thread;
 
 const WIDTH: usize = 640;
 const HEIGHT: usize = 360;
@@ -144,10 +144,28 @@ fn render_mandlebrot(
     
 }
 
+fn update(
+    settings : &mut MandleParams,
+    grid : &mut Grid<f64>,
+    pixels : &mut Pixels
+){
+    loop {
+        settings.zoom = settings.zoom * 0.95;
 
-fn main() -> Result<(),Error>{
+        calc_mandlebrot_set(
+            grid,
+            settings.x,
+            settings.y,
+            settings.zoom,
+            settings.iterations
+        );
+        render_mandlebrot(&grid,pixels.frame_mut()); 
+        pixels.render();
+    }
+}
+
+fn main() -> Result<(),Error> {
     
-
     let mut settings = MandleParams{
         x:-0.20710786709396773,
         y:1.12275706363259748,
@@ -201,21 +219,28 @@ fn main() -> Result<(),Error>{
 
     window.set_maximized(true);
 
-    event_loop.run(move | event, _, _control_flow | {
-        settings.zoom = settings.zoom * 0.95;
+    thread::spawn(move || update(
+        &mut settings,
+        &mut grid,
+        &mut pixels
+    ));
 
-        calc_mandlebrot_set(
-            &mut grid,
-            settings.x,
-            settings.y,
-            settings.zoom,
-            settings.iterations
-        );
-        render_mandlebrot(&grid,pixels.frame_mut()); 
-        pixels.render();
+    event_loop.run(move | event, _, control_flow | {
+        *control_flow = ControlFlow::Wait;
+
+
 
         if let Event::RedrawRequested(_) = event {
         
+        }
+
+        match event {
+            Event::WindowEvent { event, .. } => match event {
+                WindowEvent::CloseRequested 
+                    => *control_flow = ControlFlow::Exit,
+                _ => (),
+            },
+            _ => (),
         }
     });
 
