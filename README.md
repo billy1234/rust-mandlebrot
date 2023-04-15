@@ -5,7 +5,7 @@ A mandlebrot set generator/renderer.
 
 To run in debug mode:
 
-        cargo run src/main.rs
+    cargo run src/main.rs
 
 Or simply build and run the executable.
 
