@@ -5,10 +5,65 @@ use winit::{
     event_loop::EventLoop,
     window::WindowBuilder,
 };
+use std::clone::Clone;
 
 
-const WIDTH: u32 = 400;
-const HEIGHT: u32 = 300;
+const WIDTH: usize = 640;
+const HEIGHT: usize = 360;
+
+struct MandleParams{
+    x : f32,
+    y : f32,
+    zoom : f32,
+    iterations : u32,
+}
+
+struct Grid<T: Clone> {
+    rows : usize,
+    cols : usize,
+    contents: Box<[T]>,
+}
+
+impl<T : Clone> Grid<T> {
+
+    fn new(rows: usize, cols: usize, default: T) -> Grid<T> {
+        Grid::<T>{
+            rows: rows,
+            cols: cols,
+            contents: vec![default; rows * cols]
+                .into_boxed_slice(),     
+        }
+    }
+
+    fn get(&mut self, x : usize, y : usize) -> &mut T{
+        if x >= self.rows || y >= self.cols {
+            panic!(
+                "x:{} y:{} out of bounds for grid[{},{}]",
+                x,
+                y,
+                self.rows,
+                self.cols
+            );
+        } else {
+            return &mut self.contents[y * self.rows + x];
+        }
+    }
+
+    fn get_val(&self, x : usize, y : usize) -> T {
+        if x >= self.rows || y >= self.cols {
+            panic!(
+                "x:{} y:{} out of bounds for grid[{},{}]",
+                x,
+                y,
+                self.rows,
+                self.cols
+            );
+        } else {
+            return (self.contents[y * self.rows + x]).clone();
+        }
+    }
+}
+
 
 fn calc_mandle_divergence(mut a : f32, mut b : f32, max_iter : u32) -> f32{
     let z0_a : f32 = a;
@@ -33,16 +88,16 @@ fn calc_mandle_divergence(mut a : f32, mut b : f32, max_iter : u32) -> f32{
 }
 
 fn calc_mandlebrot_set(a : f32, b: f32, zoom_level: f32, max_iter: u32) 
-        -> [[f32; HEIGHT as usize]; WIDTH as usize]{
+        -> Grid<f32>{
     //A is the real part of the complex number
     //B is the coefficent to I
 
-    let mut arr: [[f32; HEIGHT as usize]; WIDTH as usize] 
-        = [[0.0; HEIGHT as usize]; WIDTH as usize];
+    let mut grid: Grid<f32> 
+        = Grid::new(WIDTH, HEIGHT, 0.0);
 
     for x in 0..WIDTH{
         for y in 0..HEIGHT{
-            arr[x as usize][y as usize] = calc_mandle_divergence(
+            *grid.get(x as usize,y as usize) = calc_mandle_divergence(
                 a + (x as f32 - WIDTH as f32 /2.0 ) * zoom_level,
                 b + (y as f32 - HEIGHT as f32 /2.0) * zoom_level,
                 max_iter
@@ -50,7 +105,7 @@ fn calc_mandlebrot_set(a : f32, b: f32, zoom_level: f32, max_iter: u32)
         }
     }
 
-    return arr;
+    return grid;
 }
 
 //map divergence value (x) to a set of r/g/b
@@ -67,13 +122,13 @@ fn map_color(x : f32) -> [u8; 3]{
 }
 
 fn render_mandlebrot(
-    arr : &[[f32; HEIGHT as usize]; WIDTH as usize],
+    grid : & Grid<f32>,
     frame : & mut [u8]
     ){
     
     for x in 0..WIDTH{
         for y in 0..HEIGHT{
-            let col = map_color(arr[x as usize][y as usize]); 
+            let col = map_color(grid.get_val(x,y)); 
             // r/g/b/a
             frame[((x + (y * WIDTH)) * 4    ) as usize] = col[0];
             frame[((x + (y * WIDTH)) * 4 + 1) as usize] = col[1];
@@ -87,7 +142,19 @@ fn render_mandlebrot(
 
 fn main() -> Result<(),Error>{
 
-    let arr = calc_mandlebrot_set(0.0,0.0,0.01,255);
+    let settings = MandleParams{
+        x:0.0,
+        y:0.0,
+        zoom:0.01,
+        iterations:255 
+    };
+
+    let grid = calc_mandlebrot_set(
+        settings.x,
+        settings.y,
+        settings.zoom,
+        settings.iterations
+    );
 
     let event_loop = EventLoop::new();
 
@@ -105,17 +172,17 @@ fn main() -> Result<(),Error>{
     let mut pixels = {
         let window_size = window.inner_size();
         let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, &window);
-        Pixels::new(WIDTH, HEIGHT, surface_texture)?
+        Pixels::new(WIDTH as u32, HEIGHT as u32, surface_texture)?
     };
     
-    render_mandlebrot(&arr,pixels.frame_mut());
+    render_mandlebrot(&grid,pixels.frame_mut());
     pixels.render()?;
 
     event_loop.run(move | event, _, _control_flow | {
         
         if let Event::RedrawRequested(_) = event {
-            //render_mandlebrot(&arr,pixels.frame_mut());
-           //pixels.render();
+            render_mandlebrot(&grid,pixels.frame_mut());
+            pixels.render();
         }
     });
 
