@@ -12,9 +12,9 @@ const WIDTH: usize = 640;
 const HEIGHT: usize = 360;
 
 struct MandleParams{
-    x : f32,
-    y : f32,
-    zoom : f32,
+    x : f64,
+    y : f64,
+    zoom : f64,
     iterations : u32,
 }
 
@@ -65,16 +65,21 @@ impl<T : Clone> Grid<T> {
 }
 
 
-fn calc_mandle_divergence(mut a : f32, mut b : f32, max_iter : u32) -> f32{
-    let z0_a : f32 = a;
-    let z0_b : f32 = b;
+fn calc_mandle_divergence(
+    mut a : f64, 
+    mut b : f64, 
+    max_iter : u32
+) -> f64{
+
+    let z0_a : f64 = a;
+    let z0_b : f64 = b;
     for i in 0..max_iter{
-        if a.abs() + b.abs() > 2.0 {
-            return i as f32 / max_iter as f32;
+        if a.abs() + b.abs() > 4.0 {
+            return i as f64 / max_iter as f64;
         }
         //square Z[I]
-        let a_new : f32 = a * a - b * b;
-        let b_new : f32 = 2.0 * a * b;
+        let a_new : f64 = a * a - b * b;
+        let b_new : f64 = 2.0 * a * b;
 
         a = a_new;
         b = b_new;
@@ -87,29 +92,29 @@ fn calc_mandle_divergence(mut a : f32, mut b : f32, max_iter : u32) -> f32{
     return 0.0;
 }
 
-fn calc_mandlebrot_set(a : f32, b: f32, zoom_level: f32, max_iter: u32) 
-        -> Grid<f32>{
+fn calc_mandlebrot_set(
+    grid : &mut Grid<f64>,
+    a : f64, 
+    b: f64, 
+    zoom_level: f64, 
+    max_iter: u32
+    ){
     //A is the real part of the complex number
     //B is the coefficent to I
-
-    let mut grid: Grid<f32> 
-        = Grid::new(WIDTH, HEIGHT, 0.0);
 
     for x in 0..WIDTH{
         for y in 0..HEIGHT{
             *grid.get(x as usize,y as usize) = calc_mandle_divergence(
-                a + (x as f32 - WIDTH as f32 /2.0 ) * zoom_level,
-                b + (y as f32 - HEIGHT as f32 /2.0) * zoom_level,
+                a + (x as f64 - WIDTH as f64 /2.0 ) * zoom_level,
+                b + (y as f64 - HEIGHT as f64 /2.0) * zoom_level,
                 max_iter
             );
         }
     }
-
-    return grid;
 }
 
 //map divergence value (x) to a set of r/g/b
-fn map_color(x : f32) -> [u8; 3]{
+fn map_color(x : f64) -> [u8; 3]{
     //Constant is max of u24 (3 u8s)
     let num = (x * 4294967296.0) as u32;
     let mut arr : [u8; 3] = [0; 3];
@@ -122,7 +127,7 @@ fn map_color(x : f32) -> [u8; 3]{
 }
 
 fn render_mandlebrot(
-    grid : & Grid<f32>,
+    grid : & Grid<f64>,
     frame : & mut [u8]
     ){
     
@@ -141,15 +146,20 @@ fn render_mandlebrot(
 
 
 fn main() -> Result<(),Error>{
+    
 
-    let settings = MandleParams{
-        x:0.0,
-        y:0.0,
+    let mut settings = MandleParams{
+        x:-0.20710786709396773,
+        y:1.12275706363259748,
         zoom:0.01,
-        iterations:255 
+        iterations:1000 
     };
 
-    let grid = calc_mandlebrot_set(
+    let mut grid: Grid<f64> 
+        = Grid::new(WIDTH, HEIGHT, 0.0);
+
+    calc_mandlebrot_set(
+        &mut grid,
         settings.x,
         settings.y,
         settings.zoom,
@@ -159,7 +169,10 @@ fn main() -> Result<(),Error>{
     let event_loop = EventLoop::new();
 
     let window = { 
-        let scaled_size = LogicalSize::new(WIDTH as f64 * 3.0, HEIGHT as f64 * 3.0); 
+        let scaled_size = LogicalSize::new(
+            WIDTH as f64 * 3.0, 
+            HEIGHT as f64 * 3.0
+        ); 
         let size = LogicalSize::new(WIDTH as f64, HEIGHT as f64);
         WindowBuilder::new()
             .with_title("Mandlebrot set")
@@ -171,18 +184,36 @@ fn main() -> Result<(),Error>{
 
     let mut pixels = {
         let window_size = window.inner_size();
-        let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, &window);
-        Pixels::new(WIDTH as u32, HEIGHT as u32, surface_texture)?
+        let surface_texture = SurfaceTexture::new(
+            window_size.width, 
+            window_size.height, 
+            &window
+        );
+        Pixels::new(
+            WIDTH as u32,
+            HEIGHT as u32,
+            surface_texture
+        )?
     };
     
     render_mandlebrot(&grid,pixels.frame_mut());
     pixels.render()?;
 
     event_loop.run(move | event, _, _control_flow | {
-        
+        settings.zoom = settings.zoom * 0.95;
+
+        calc_mandlebrot_set(
+            &mut grid,
+            settings.x,
+            settings.y,
+            settings.zoom,
+            settings.iterations
+        );
+        render_mandlebrot(&grid,pixels.frame_mut()); 
+        pixels.render();
+
         if let Event::RedrawRequested(_) = event {
-            render_mandlebrot(&grid,pixels.frame_mut());
-            pixels.render();
+        
         }
     });
 
