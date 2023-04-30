@@ -1,21 +1,40 @@
 use pixels::{Error, Pixels, SurfaceTexture};
 use winit::{
     dpi::LogicalSize,
-    event::{Event, WindowEvent},
+    event::{Event, VirtualKeyCode},
     event_loop::{EventLoop, ControlFlow},
     window::WindowBuilder,
 };
+use winit_input_helper::WinitInputHelper;
 use std::clone::Clone;
 use std::thread;
+
+use fixed::FixedI128;
+use fixed::types::extra::U123;
+
+type MReal = FixedI128<U123>;
+//This type allows a max of 15/-15 (max the mandle calculation should ever need is +/-8) 
 
 const WIDTH: usize = 640;
 const HEIGHT: usize = 360;
 
-struct MandleParams{
-    x : f64,
-    y : f64,
-    zoom : f64,
+struct MandleParams {
+    x : MReal,
+    y : MReal,
+    zoom : MReal,
     iterations : u32,
+}
+
+impl std::fmt::Display for MandleParams{
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error>{
+        write!(
+            fmt,"MandleParams[X: {}, Y: {}, Zoom:{}, Iterations:{}]",
+            self.x,
+            self.y,
+            self.zoom,
+            self.iterations
+        )
+    }
 }
 
 struct Grid<T: Clone> {
@@ -66,20 +85,20 @@ impl<T : Clone> Grid<T> {
 
 
 fn calc_mandle_divergence(
-    mut a : f64, 
-    mut b : f64, 
+    mut a : MReal, 
+    mut b : MReal, 
     max_iter : u32
 ) -> f64 {
 
-    let z0_a : f64 = a;
-    let z0_b : f64 = b;
+    let z0_a : MReal = a;
+    let z0_b : MReal = b;
     for i in 0..max_iter{
         if a.abs() + b.abs() > 4.0 {
-            return i as f64 / max_iter as f64;
+           return i as f64 / max_iter as f64;
         }
         //square Z[I]
-        let a_new : f64 = a * a - b * b;
-        let b_new : f64 = 2.0 * a * b;
+        let a_new : MReal = a * a - b * b;
+        let b_new : MReal = MReal::from_num(2.0) * a * b;
 
         a = a_new;
         b = b_new;
@@ -92,11 +111,12 @@ fn calc_mandle_divergence(
     return 0.0;
 }
 
+
 fn calc_mandlebrot_set(
     grid : &mut Grid<f64>,
-    a : f64, 
-    b: f64, 
-    zoom_level: f64, 
+    a : MReal, 
+    b: MReal, 
+    zoom_level: MReal, 
     max_iter: u32
     ){
     //A is the real part of the complex number
@@ -105,8 +125,8 @@ fn calc_mandlebrot_set(
     for x in 0..WIDTH{
         for y in 0..HEIGHT{
             *grid.get(x as usize,y as usize) = calc_mandle_divergence(
-                a + (x as f64 - WIDTH as f64 /2.0 ) * zoom_level,
-                b + (y as f64 - HEIGHT as f64 /2.0) * zoom_level,
+                a + (MReal::from_num(x) - MReal::from_num(WIDTH as f64 / 2.0)) * zoom_level,
+                b + (MReal::from_num(y) - MReal::from_num(HEIGHT as f64 / 2.0)) * zoom_level,
                 max_iter
             );
         }
@@ -145,13 +165,11 @@ fn render_mandlebrot(
 }
 
 fn update(
-    settings : &mut MandleParams,
+    settings : & MandleParams,
     grid : &mut Grid<f64>,
     pixels : &mut Pixels
 ){
     loop {
-        settings.zoom = settings.zoom * 0.95;
-
         calc_mandlebrot_set(
             grid,
             settings.x,
@@ -165,12 +183,11 @@ fn update(
 }
 
 fn main() -> Result<(),Error> {
-    
     let mut settings = MandleParams{
-        x:-0.20710786709396773,
-        y:1.12275706363259748,
-        zoom:0.01,
-        iterations:300 
+        x: MReal::from_num(-0.20710786709396773),
+        y: MReal::from_num(1.12275706363259748),
+        zoom: MReal::from_num(0.00000000000000000522869402271788),
+        iterations: 300 
     };
 
     let mut grid: Grid<f64> 
@@ -218,13 +235,15 @@ fn main() -> Result<(),Error> {
     pixels.render()?;
 
     window.set_maximized(true);
-
+    
+    let mut input = WinitInputHelper::new();
+    
     thread::spawn(move || update(
-        &mut settings,
+        &settings,
         &mut grid,
         &mut pixels
     ));
-
+    
     event_loop.run(move | event, _, control_flow | {
         *control_flow = ControlFlow::Wait;
 
@@ -234,15 +253,20 @@ fn main() -> Result<(),Error> {
         
         }
 
-        match event {
-            Event::WindowEvent { event, .. } => match event {
-                WindowEvent::CloseRequested 
-                    => *control_flow = ControlFlow::Exit,
-                _ => (),
-            },
-            _ => (),
+        if input.update(&event) {
+            if input.key_pressed(VirtualKeyCode::Escape) || input.quit() {
+                *control_flow = ControlFlow::Exit;
+                return;
+            }
+            if input.key_pressed(VirtualKeyCode::Space){
+                settings.zoom = settings.zoom * MReal::from_num(0.95f64);
+            }
+            if input.key_pressed(VirtualKeyCode::RAlt){
+                settings.zoom = settings.zoom * MReal::from_num(1.05f64);
+            }
         }
-    });
+        
 
+    });
 }
 
