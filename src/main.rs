@@ -8,6 +8,8 @@ use winit::{
 use winit_input_helper::WinitInputHelper;
 use std::clone::Clone;
 use std::thread;
+use std::sync::RwLock;
+use std::sync::Arc;
 
 use fixed::FixedI128;
 use fixed::types::extra::U123;
@@ -165,40 +167,41 @@ fn render_mandlebrot(
 }
 
 fn update(
-    settings : & MandleParams,
+    settings : &RwLock<MandleParams>,
     grid : &mut Grid<f64>,
     pixels : &mut Pixels
 ){
     loop {
         calc_mandlebrot_set(
             grid,
-            settings.x,
-            settings.y,
-            settings.zoom,
-            settings.iterations
+            settings.read().unwrap().x,
+            settings.read().unwrap().y,
+            settings.read().unwrap().zoom,
+            settings.read().unwrap().iterations
         );
         render_mandlebrot(&grid,pixels.frame_mut()); 
         pixels.render();
     }
 }
 
-fn main() -> Result<(),Error> {
-    let mut settings = MandleParams{
+fn main() -> Result<(), Error> {
+    let settings = Arc::new(RwLock::new(MandleParams{
         x: MReal::from_num(-0.20710786709396773),
         y: MReal::from_num(1.12275706363259748),
         zoom: MReal::from_num(0.00000000000000000522869402271788),
         iterations: 300 
-    };
+    }));
 
+    
     let mut grid: Grid<f64> 
         = Grid::new(WIDTH, HEIGHT, 0.0);
 
     calc_mandlebrot_set(
         &mut grid,
-        settings.x,
-        settings.y,
-        settings.zoom,
-        settings.iterations
+        settings.read().unwrap().x,
+        settings.read().unwrap().y,
+        settings.read().unwrap().zoom,
+        settings.read().unwrap().iterations
     );
 
     let event_loop = EventLoop::new();
@@ -236,13 +239,18 @@ fn main() -> Result<(),Error> {
 
     window.set_maximized(true);
     
-    let mut input = WinitInputHelper::new();
+    let mut input = WinitInputHelper::new(); 
     
-    thread::spawn(move || update(
-        &settings,
-        &mut grid,
-        &mut pixels
-    ));
+    thread::spawn({
+        let read_settings = Arc::clone(&settings);
+
+        move || update(
+            &read_settings,
+            &mut grid,
+            &mut pixels
+        )
+    });
+
     
     event_loop.run(move | event, _, control_flow | {
         *control_flow = ControlFlow::Wait;
@@ -259,10 +267,10 @@ fn main() -> Result<(),Error> {
                 return;
             }
             if input.key_pressed(VirtualKeyCode::Space){
-                settings.zoom = settings.zoom * MReal::from_num(0.95f64);
+                settings.write().unwrap().zoom = settings.read().unwrap().zoom * MReal::from_num(0.95f64);
             }
             if input.key_pressed(VirtualKeyCode::RAlt){
-                settings.zoom = settings.zoom * MReal::from_num(1.05f64);
+                settings.write().unwrap().zoom = settings.read().unwrap().zoom * MReal::from_num(1.05f64);
             }
         }
         
