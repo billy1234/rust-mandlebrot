@@ -12,10 +12,11 @@ use std::sync::RwLock;
 use std::sync::Arc;
 
 use fixed::FixedI128;
-use fixed::types::extra::U123;
+use fixed::types::extra::U117;
 
-type MReal = FixedI128<U123>;
-//This type allows a max of 15/-15 (max the mandle calculation should ever need is +/-8) 
+type MReal = FixedI128<U117>;
+//This type allows a max of 1024/-1024.
+//Width or heigh will be the value that decdes this range
 
 const WIDTH: usize = 640;
 const HEIGHT: usize = 360;
