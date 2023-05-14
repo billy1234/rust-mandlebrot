@@ -103,12 +103,10 @@ fn calc_mandle_divergence(
         let a_new : MReal = a * a - b * b;
         let b_new : MReal = MReal::from_num(2.0) * a * b;
 
-        a = a_new;
-        b = b_new;
-
         //Z[I] + Z[0]
-        a = a + z0_a;
-        b = b + z0_b;
+        a = a_new + z0_a;
+        b = b_new + z0_b;
+
 
     }
     return 0.0;
@@ -180,8 +178,11 @@ fn update(
             settings.read().unwrap().zoom,
             settings.read().unwrap().iterations
         );
-        render_mandlebrot(&grid,pixels.frame_mut()); 
-        pixels.render();
+        render_mandlebrot(&grid, pixels.frame_mut()); 
+        match pixels.render() {
+            Ok(_) => {}
+            Err(err) => {println!("Error {}", err); break;}
+        }
     }
 }
 
@@ -189,7 +190,7 @@ fn main() -> Result<(), Error> {
     let settings = Arc::new(RwLock::new(MandleParams{
         x: MReal::from_num(-0.20710786709396773),
         y: MReal::from_num(1.12275706363259748),
-        zoom: MReal::from_num(0.00000000000000000522869402271788),
+        zoom: MReal::from_num(0.01),
         iterations: 300 
     }));
 
@@ -257,6 +258,7 @@ fn main() -> Result<(), Error> {
         *control_flow = ControlFlow::Wait;
 
 
+        //settings.write().unwrap().zoom = settings.read().unwrap().zoom * MReal::from_num(0.95f64);
 
         if let Event::RedrawRequested(_) = event {
         
@@ -268,10 +270,10 @@ fn main() -> Result<(), Error> {
                 return;
             }
             if input.key_pressed(VirtualKeyCode::Space){
-                settings.write().unwrap().zoom = settings.read().unwrap().zoom * MReal::from_num(0.95f64);
+                settings.write().unwrap().zoom *= MReal::from_num(0.95f64);
             }
             if input.key_pressed(VirtualKeyCode::RAlt){
-                settings.write().unwrap().zoom = settings.read().unwrap().zoom * MReal::from_num(1.05f64);
+                settings.write().unwrap().zoom *= MReal::from_num(1.05f64);
             }
         }
         
